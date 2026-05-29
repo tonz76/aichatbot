@@ -8,6 +8,7 @@ info/
 faiss_index/
 vectorstore/
 chat_history.txt
+system_prompt.txt
 
 # Python
 __pycache__/

@@ -53,6 +53,25 @@
         .msg.bot { background-color: #333; color: white; align-self: flex-end; border-bottom-right-radius: 0; }
         
         .empty-state { margin: auto; color: #666; font-size: 1.2rem; }
+        
+        /* Modal Styles สำหรับแก้ Prompt */
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0;
+            width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.7);
+        }
+        .modal-content {
+            background-color: var(--panel-bg); margin: 5% auto; padding: 25px;
+            border: 1px solid var(--border); border-radius: 10px; width: 85%; max-width: 900px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column;
+        }
+        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; align-self: flex-end; line-height: 1;}
+        .close-btn:hover { color: #fff; }
+        .prompt-textarea {
+            width: 100%; height: 50vh; background-color: #121212; color: #4CAF50;
+            border: 1px solid var(--border); border-radius: 5px; padding: 15px; font-size: 1rem;
+            margin-top: 15px; margin-bottom: 15px; resize: vertical; font-family: monospace; white-space: pre-wrap; line-height: 1.5;
+        }
+        .prompt-textarea:focus { outline: none; border-color: var(--accent); }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
 </head>
@@ -62,6 +81,7 @@
         <div class="sidebar-header">
             <span>👥 ลูกค้าที่กำลังคุย (<span id="total-count">0</span>)</span>
             <div>
+                <button class="refresh-btn" style="background-color: #ff9800; margin-right: 5px;" onclick="openPromptModal()">⚙️ ตั้งค่าบอท</button>
                 <button class="refresh-btn" style="background-color: #4caf50; margin-right: 5px;" onclick="window.location.href='/admin/upload'">เพิ่มไฟล์ใหม่</button>
                 <button class="refresh-btn" style="background-color: #2196F3; margin-right: 5px;" onclick="reloadDocs()">อัปเดตไฟล์</button>
                 <button class="refresh-btn" onclick="fetchLogs()">รีเฟรช</button>
@@ -75,6 +95,17 @@
         <div class="chat-header" id="chat-header">คลิกที่รายชื่อด้านซ้ายเพื่อดูประวัติการสนทนา</div>
         <div class="chat-content" id="chat-content">
             <div class="empty-state">กรุณาเลือก Session</div>
+        </div>
+    </div>
+
+    <!-- หน้าต่างแก้ไข System Prompt Modal -->
+    <div id="promptModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closePromptModal()">&times;</span>
+            <h2 style="color: white; margin-bottom: 10px;">⚙️ ปรับแต่งบุคลิก AI (System Prompt)</h2>
+            <p style="color: #aaa; font-size: 0.9rem;">แก้ไขคำสั่งตั้งต้น เพื่อเปลี่ยนนิสัย กฎเกณฑ์ หรือวิธีการตอบคำถามของบอท (เมื่อบันทึกแล้ว ระบบจะเรียนรู้และปรับพฤติกรรมทันที)</p>
+            <textarea id="promptInput" class="prompt-textarea"></textarea>
+            <button class="refresh-btn" style="background-color: #4caf50; padding: 10px; font-size: 1rem;" id="savePromptBtn" onclick="savePrompt()">💾 บันทึกการเปลี่ยนแปลง</button>
         </div>
     </div>
 
@@ -176,6 +207,53 @@
                 }
             } catch (error) {
                 alert("เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์");
+            }
+        }
+
+        // เปิดหน้าแก้ไข Prompt
+        async function openPromptModal() {
+            const modal = document.getElementById('promptModal');
+            const textarea = document.getElementById('promptInput');
+            
+            try {
+                const response = await fetch('/api/admin/prompt');
+                if (response.status === 401) { window.location.href = '/login'; return; }
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    textarea.value = result.prompt;
+                    modal.style.display = 'block';
+                } else {
+                    alert("❌ " + result.message);
+                }
+            } catch (error) {
+                alert("เกิดข้อผิดพลาดในการดึงข้อมูล Prompt");
+            }
+        }
+
+        function closePromptModal() { document.getElementById('promptModal').style.display = 'none'; }
+
+        // เซฟการแก้ไข Prompt
+        async function savePrompt() {
+            const newPrompt = document.getElementById('promptInput').value;
+            const saveBtn = document.getElementById('savePromptBtn');
+            saveBtn.innerText = 'กำลังบันทึก...'; saveBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/admin/prompt', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: newPrompt })
+                });
+                if (response.status === 401) { window.location.href = '/login'; return; }
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert("✨ " + result.message); closePromptModal();
+                } else { alert("❌ " + result.message); }
+            } catch (error) {
+                alert("เกิดข้อผิดพลาดในการบันทึก Prompt");
+            } finally {
+                saveBtn.innerText = '💾 บันทึกการเปลี่ยนแปลง'; saveBtn.disabled = false;
             }
         }
     </script>

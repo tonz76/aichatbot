@@ -5,7 +5,7 @@ import uuid
 import os
 import shutil  # 📌 [เพิ่มใหม่] นำเข้าโมดูลจัดการไฟล์อย่างมีประสิทธิภาพ
 
-from .chatbot import get_chat_response, reload_knowledge, get_vectorstore_debug_data
+from .chatbot import get_chat_response, reload_knowledge, get_vectorstore_debug_data, get_system_prompt, update_system_prompt
 from .telegram_utils import send_lead_to_telegram
 
 app = FastAPI(docs_url=None, redoc_url=None) # 🔒 ปิดหน้าเอกสาร API เพื่อความปลอดภัย
@@ -27,6 +27,9 @@ memory_backend = RedisMemoryBackend()
 
 class ChatRequest(BaseModel):
     message: str
+
+class PromptRequest(BaseModel):
+    prompt: str
 
 class LoginRequest(BaseModel):
     username: str
@@ -119,6 +122,21 @@ async def api_debug_rag(auth=Depends(verify_admin_auth)):
         return get_vectorstore_debug_data()
     except Exception as e:
         return {"status": "error", "message": f"เกิดข้อผิดพลาด: {str(e)}"}
+
+@app.get("/api/admin/prompt")
+async def api_get_prompt(auth=Depends(verify_admin_auth)):
+    try:
+        return {"status": "success", "prompt": get_system_prompt()}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/admin/prompt")
+async def api_update_prompt(request: PromptRequest, auth=Depends(verify_admin_auth)):
+    try:
+        update_system_prompt(request.prompt)
+        return {"status": "success", "message": "อัปเดต System Prompt สำเร็จ! ระบบได้เปลี่ยนบุคลิกเรียบร้อยแล้ว"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 # 🔒 เปิดหน้าเว็บสำหรับอัปโหลดไฟล์ (ต้องล็อกอินก่อนเท่านั้น)
 @app.get("/admin/upload", response_class=HTMLResponse)
