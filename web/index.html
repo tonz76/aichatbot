@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Condominium Virtual Assistant</title>
+    <style>
+        :root {
+            --primary-color: #1a365d; /* สีน้ำเงินเข้ม พรีเมียม */
+            --accent-color: #c5a059;  /* สีทองหรูหรา */
+            --bg-color: #f4f7f6;
+            --chat-bg: #ffffff;
+            --text-color: #333333;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
+        
+        body {
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 450px;
+            height: 90vh;
+            background: var(--chat-bg);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-bottom: 4px solid var(--accent-color);
+        }
+
+        .chat-box {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background-color: #fafafa;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 15px;
+            line-height: 1.5;
+            font-size: 0.95rem;
+            word-wrap: break-word;
+        }
+
+        .bot-message {
+            background-color: #e9ecef;
+            color: var(--text-color);
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+        }
+
+        .user-message {
+            background-color: var(--primary-color);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+
+        .input-area {
+            padding: 15px;
+            background: white;
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid #ddd;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .input-area input:focus { border-color: var(--accent-color); }
+
+        .send-btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        .send-btn:hover { background-color: #b08d4b; }
+
+        /* อนิเมชันตอนโหลด */
+        .typing-indicator {
+            display: none;
+            align-self: flex-start;
+            background-color: #e9ecef;
+            padding: 12px 16px;
+            border-radius: 15px;
+            border-bottom-left-radius: 2px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">
+        🏢 โครงการคอนโดมิเนียม
+    </div>
+    
+    <div class="chat-box" id="chat-box">
+        <div class="message bot-message">
+            สวัสดีค่าา! ✨ สนใจสอบถามข้อมูลโครงการ หรือนัดหมายเข้ามาดูห้องตัวอย่างสวยๆ แจ้งหนูได้เลยนะคะ ยินดีให้คำแนะนำเต็มที่เลยค่า 😊
+        </div>
+        <div class="typing-indicator" id="typing">กำลังพิมพ์...</div>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="user-input" placeholder="พิมพ์ข้อความที่นี่..." autocomplete="off">
+        <button class="send-btn" onclick="sendMessage()">ส่ง</button>
+    </div>
+</div>
+
+<script>
+    const chatBox = document.getElementById('chat-box');
+    const userInput = document.getElementById('user-input');
+    const typingIndicator = document.getElementById('typing');
+
+    // กด Enter เพื่อส่งข้อความได้
+    userInput.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') sendMessage();
+    });
+
+    async function sendMessage() {
+        const text = userInput.value.trim();
+        if (!text) return;
+
+        // 1. แสดงข้อความของ User
+        appendMessage(text, 'user-message');
+        userInput.value = '';
+
+        // 2. แสดงสถานะกำลังพิมพ์ และเลื่อนจอลงสุด
+        typingIndicator.style.display = 'block';
+        chatBox.appendChild(typingIndicator); 
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        try {
+            // 3. ยิง API ไปที่ FastAPI หลังบ้านของเรา
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+            
+            const data = await response.json();
+            
+            // 4. ซ่อนสถานะกำลังพิมพ์ และแสดงข้อความของ Bot
+            typingIndicator.style.display = 'none';
+            appendMessage(data.reply, 'bot-message');
+            
+        } catch (error) {
+            typingIndicator.style.display = 'none';
+            appendMessage('ขออภัยครับ ระบบเกิดข้อผิดพลาดชั่วคราว กรุณาลองใหม่อีกครั้ง', 'bot-message');
+        }
+    }
+
+    function appendMessage(text, className) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${className}`;
+        // แปลง \n เป็น <br> เพื่อให้ขึ้นบรรทัดใหม่สวยงาม
+        msgDiv.innerHTML = text.replace(/\n/g, '<br>');
+        chatBox.insertBefore(msgDiv, typingIndicator);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+</script>
+
+</body>
+</html>

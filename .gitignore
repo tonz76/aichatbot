@@ -1,0 +1,19 @@
+# Environments & Secrets
+.env
+venv/
+env/
+
+# Project Data & AI Memory
+info/
+faiss_index/
+vectorstore/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS generated files
+.DS_Store
+Thumbs.db

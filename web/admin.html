@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Condo Bot</title>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --panel-bg: #1e1e1e;
+            --text-main: #e0e0e0;
+            --accent: #4caf50;
+            --border: #333;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
+        
+        body { background-color: var(--bg-dark); color: var(--text-main); display: flex; height: 100vh; }
+        
+        /* แถบเมนูด้านซ้าย (รายชื่อ Session) */
+        .sidebar {
+            width: 300px;
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            background-color: #1a1a1a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .refresh-btn {
+            background-color: var(--accent); color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;
+        }
+        .session-list { flex: 1; overflow-y: auto; }
+        .session-item {
+            padding: 15px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s;
+            font-size: 0.9rem;
+        }
+        .session-item:hover, .session-item.active { background-color: #2c2c2c; border-left: 4px solid var(--accent); }
+        .session-id { font-weight: bold; color: #fff; margin-bottom: 5px; font-size: 0.8rem; word-break: break-all; }
+        
+        /* พื้นที่แสดงแชทด้านขวา */
+        .chat-view { flex: 1; display: flex; flex-direction: column; background-color: var(--bg-dark); }
+        .chat-header { padding: 20px; border-bottom: 1px solid var(--border); background-color: var(--panel-bg); font-weight: bold; }
+        .chat-content { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        
+        .msg { max-width: 70%; padding: 12px 15px; border-radius: 8px; line-height: 1.5; font-size: 0.95rem; }
+        .msg.user { background-color: #2b5278; color: white; align-self: flex-start; border-bottom-left-radius: 0; }
+        .msg.bot { background-color: #333; color: white; align-self: flex-end; border-bottom-right-radius: 0; }
+        
+        .empty-state { margin: auto; color: #666; font-size: 1.2rem; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <span>👥 ลูกค้าที่กำลังคุย (<span id="total-count">0</span>)</span>
+            <div>
+                <button class="refresh-btn" style="background-color: #4caf50; margin-right: 5px;" onclick="window.location.href='/admin/upload'">เพิ่มไฟล์ใหม่</button>
+                <button class="refresh-btn" style="background-color: #2196F3; margin-right: 5px;" onclick="reloadDocs()">อัปเดตไฟล์</button>
+                <button class="refresh-btn" onclick="fetchLogs()">รีเฟรช</button>
+            </div>
+        </div>
+        <div class="session-list" id="session-list">
+            </div>
+    </div>
+
+    <div class="chat-view">
+        <div class="chat-header" id="chat-header">คลิกที่รายชื่อด้านซ้ายเพื่อดูประวัติการสนทนา</div>
+        <div class="chat-content" id="chat-content">
+            <div class="empty-state">กรุณาเลือก Session</div>
+        </div>
+    </div>
+
+    <script>
+        let allChatData = {};
+
+        
+// ฟังก์ชันดึงข้อมูลจาก API (เวอร์ชันอัปเดตดักจับความปลอดภัย)
+        async function fetchLogs() {
+            try {
+                const response = await fetch('/api/admin/logs');
+                
+                // 📌 ถ้าโดนระบบหลังบ้านเตะเพราะไม่ได้ล็อกอิน ให้เด้งไปหน้าล็อกอินทันที
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+
+                const result = await response.json();
+                allChatData = result.data;
+                document.getElementById('total-count').innerText = result.total_sessions;
+                
+                renderSessionList();
+            } catch (error) {
+                console.error("Error fetching logs:", error);
+            }
+        }
+
+        // วาดรายชื่อ Session ทางซ้าย
+        function renderSessionList() {
+            const listContainer = document.getElementById('session-list');
+            listContainer.innerHTML = ''; // ล้างของเก่า
+
+            // วนลูปสร้างรายการ
+            Object.keys(allChatData).reverse().forEach(sessionId => {
+                const messages = allChatData[sessionId];
+                const msgCount = messages.length;
+                
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'session-item';
+                itemDiv.innerHTML = `
+                    <div class="session-id">ID: ${sessionId.substring(0, 15)}...</div>
+                    <div style="color: #aaa;">สนทนาไปแล้ว ${msgCount/2} ตุ๊บ</div>
+                `;
+                
+                itemDiv.onclick = () => {
+                    // ล้างแถบสี active อันเก่า
+                    document.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
+                    itemDiv.classList.add('active');
+                    renderChatContent(sessionId);
+                };
+                
+                listContainer.appendChild(itemDiv);
+            });
+        }
+
+        // วาดข้อความแชททางขวา
+        function renderChatContent(sessionId) {
+            document.getElementById('chat-header').innerText = `กำลังดูประวัติของ Session: ${sessionId}`;
+            const contentContainer = document.getElementById('chat-content');
+            contentContainer.innerHTML = ''; 
+
+            const messages = allChatData[sessionId];
+            
+            messages.forEach(msg => {
+                const msgDiv = document.createElement('div');
+                // สลับฝั่งให้ User อยู่ซ้าย (แอดมินดู) และ Bot อยู่ขวา
+                msgDiv.className = `msg ${msg.role === 'user' ? 'user' : 'bot'}`;
+                
+                // ใส่ป้ายกำกับให้ดูง่ายขึ้น
+                const label = msg.role === 'user' ? '👤 ลูกค้า: ' : '🤖 บอท: ';
+                msgDiv.innerHTML = `<strong>${label}</strong><br>${msg.text.replace(/\n/g, '<br>')}`;
+                
+                contentContainer.appendChild(msgDiv);
+            });
+            
+            // เลื่อนจอลงล่างสุด
+            contentContainer.scrollTop = contentContainer.scrollHeight;
+        }
+
+        // โหลดข้อมูลทันทีที่เปิดหน้าเว็บ
+        fetchLogs();
+        
+        // ตั้งเวลารีเฟรชอัตโนมัติทุกๆ 10 วินาที
+        setInterval(fetchLogs, 10000);
+
+        // ฟังก์ชันสั่งให้ระบบอ่านไฟล์ในโฟลเดอร์ info ใหม่
+        async function reloadDocs() {
+            if(!confirm("ต้องการให้แชทบอทอ่านไฟล์ข้อมูลใหม่ทั้งหมดใช่หรือไม่? (อาจใช้เวลาสักครู่หากมีไฟล์วิดีโอ/รูปภาพใหม่)")) return;
+            
+            try {
+                const response = await fetch('/api/admin/reload-docs', { method: 'POST' });
+                const result = await response.json();
+                
+                if(result.status === 'success') {
+                    alert("✨ " + result.message);
+                } else {
+                    alert("❌ " + result.message);
+                }
+            } catch (error) {
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์");
+            }
+        }
+    </script>
+</body>
+</html>

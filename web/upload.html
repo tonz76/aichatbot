@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Knowledge - Condo Bot</title>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --panel-bg: #1e1e1e;
+            --text-main: #e0e0e0;
+            --accent: #2196F3;
+            --accent-success: #4caf50;
+            --border: #333;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
+        body { background-color: var(--bg-dark); color: var(--text-main); display: flex; flex-direction: column; min-height: 100vh; }
+        
+        /* Navigation Bar */
+        .navbar {
+            background-color: var(--panel-bg); padding: 15px 30px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .navbar-brand { font-weight: bold; color: #fff; font-size: 1.2rem; }
+        .back-btn {
+            background-color: #333; color: white; border: none; padding: 8px 15px; border-radius: 5px;
+            cursor: pointer; text-decoration: none; font-size: 0.9rem; transition: background 0.2s;
+        }
+        .back-btn:hover { background-color: #444; }
+
+        /* Main Container */
+        .container { flex: 1; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .upload-card {
+            background-color: var(--panel-bg); width: 100%; max-width: 600px; padding: 40px;
+            border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        h2 { margin-bottom: 10px; color: #fff; font-weight: 600; }
+        .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 30px; }
+
+        /* Drop Zone Area */
+        .drop-zone {
+            border: 2px dashed var(--border); border-radius: 8px; padding: 40px 20px; text-align: center;
+            cursor: pointer; transition: border-color 0.3s, background 0.3s; background-color: #151515;
+            margin-bottom: 20px; position: relative;
+        }
+        .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background-color: #1a233a; }
+        .drop-zone-icon { font-size: 3rem; margin-bottom: 15px; display: block; }
+        .drop-zone-text { color: #aaa; font-size: 1rem; }
+        #fileInput { display: none; }
+
+        /* File List Preview */
+        .file-preview {
+            background-color: #121212; border: 1px solid var(--border); border-radius: 5px;
+            padding: 15px; display: none; margin-bottom: 20px; justify-content: space-between; align-items: center;
+        }
+        .file-info { display: flex; flex-direction: column; gap: 4px; }
+        .file-name { color: #fff; font-weight: bold; font-size: 0.95rem; }
+        .file-size { color: #666; font-size: 0.85rem; }
+
+        /* Action Buttons */
+        .btn-group { display: flex; gap: 10px; }
+        .btn {
+            flex: 1; border: none; padding: 12px; border-radius: 5px; font-size: 1rem;
+            cursor: pointer; font-weight: bold; transition: opacity 0.2s; display: flex; justify-content: center; align-items: center; gap: 8px;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-upload { background-color: var(--accent); color: white; }
+        .btn-sync { background-color: var(--accent-success); color: white; display: none; }
+        
+        .status-msg { text-align: center; margin-top: 15px; font-size: 0.95rem; font-weight: bold; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div class="navbar">
+        <div class="navbar-brand">📁 ระบบเพิ่มคลังความจำให้ AI</div>
+        <a href="/admin" class="back-btn">⬅️ กลับหน้าแดชบอร์ด</a>
+    </div>
+
+    <div class="container">
+        <div class="upload-card">
+            <h2>อัปโหลดไฟล์ข้อมูลโครงการ</h2>
+            <div class="subtitle">รองรับไฟล์รูปแบบ .txt, .pdf, .docx, .xlsx, .jpg, .png, .mp4 และ weblink.txt</div>
+            
+            <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <span class="drop-zone-icon">📥</span>
+                <span class="drop-zone-text" id="dropZoneText">ลากไฟล์มาวางที่นี่ หรือ คลิกเพื่อเลือกไฟล์</span>
+                <input type="file" id="fileInput">
+            </div>
+
+            <div class="file-preview" id="filePreview">
+                <div class="file-info">
+                    <span class="file-name" id="fileName">name.pdf</span>
+                    <span class="file-size" id="fileSize">0 KB</span>
+                </div>
+                <button class="back-btn" style="background-color: #f44336; padding: 5px 10px;" onclick="resetSelection(event)">ล้างค่า</button>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-upload" id="uploadBtn" disabled onclick="handleUpload()">🚀 เริ่มอัปโหลดไฟล์</button>
+                <button class="btn btn-sync" id="syncBtn" onclick="handleSync()">✨ สั่งบอทเรียนรู้ไฟล์นี้ทันที</button>
+            </div>
+
+            <div class="status-msg" id="statusMsg"></div>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const filePreview = document.getElementById('filePreview');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const syncBtn = document.getElementById('syncBtn');
+        const statusMsg = document.getElementById('statusMsg');
+        
+        let selectedFile = null;
+
+        // ดักจับการลากไฟล์มาวาง (Drag & Drop)
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => { e.preventDefault(); dropZone.classList.add('dragover'); }, false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); }, false);
+        });
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            if(dt.files.length > 0) { selectFile(dt.files[0]); }
+        });
+
+        // ดักจับการคลิกเลือกไฟล์ปกติ
+        fileInput.addEventListener('change', (e) => {
+            if(fileInput.files.length > 0) { selectFile(fileInput.files[0]); }
+        });
+
+        // ฟังก์ชันจัดการเมื่อเลือกไฟล์สำเร็จ
+        function selectFile(file) {
+            selectedFile = file;
+            fileName.innerText = file.name;
+            fileSize.innerText = (file.size / 1024).toFixed(2) + " KB";
+            
+            dropZone.style.display = 'none';
+            filePreview.style.display = 'flex';
+            uploadBtn.disabled = false;
+            syncBtn.style.display = 'none';
+            statusMsg.innerText = '';
+        }
+
+        // ฟังก์ชันล้างค่าเพื่อเลือกใหม่
+        function resetSelection(e) {
+            if(e) e.stopPropagation();
+            selectedFile = null;
+            fileInput.value = '';
+            dropZone.style.display = 'block';
+            filePreview.style.display = 'none';
+            uploadBtn.disabled = true;
+            syncBtn.style.display = 'none';
+            statusMsg.innerText = '';
+        }
+
+        // ฟังก์ชันยิงอัปโหลดไปหลังบ้าน
+        async function handleUpload() {
+            if(!selectedFile) return;
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            uploadBtn.disabled = true;
+            statusMsg.style.color = '#2196F3';
+            statusMsg.innerText = '⏳ กำลังอัปโหลดและประมวลผลไฟล์ซักครู่นะคะ...';
+
+            try {
+                const response = await fetch('/api/admin/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+
+                const result = await response.json();
+                if(response.ok && result.status === 'success') {
+                    statusMsg.style.color = '#4caf50';
+                    statusMsg.innerText = result.message;
+                    syncBtn.style.display = 'flex'; // แสดงปุ่มสั่งซิงค์ข้อมูลต่อ
+                } else {
+                    statusMsg.style.color = '#f44336';
+                    statusMsg.innerText = '❌ เกิดข้อผิดพลาด: ' + result.message;
+                    uploadBtn.disabled = false;
+                }
+            } catch (error) {
+                statusMsg.style.color = '#f44336';
+                statusMsg.innerText = '❌ ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้';
+                uploadBtn.disabled = false;
+            }
+        }
+
+        // ฟังก์ชันสั่งโหลดข้อมูลเข้า RAG ทันทีไม่ต้องรอรีสตาร์ท
+        async function handleSync() {
+            statusMsg.style.color = '#FF9800';
+            statusMsg.innerText = '🔄 น้องแอนกำลังอ่านข้อมูลใหม่และจัดเรียงสมองซักครู่นะคะ...';
+            syncBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/admin/reload-docs', { method: 'POST' });
+                const result = await response.json();
+                
+                if(result.status === 'success') {
+                    alert("✨ " + result.message);
+                    resetSelection();
+                } else {
+                    alert("❌ เกิดข้อผิดพลาด: " + result.message);
+                    syncBtn.disabled = false;
+                }
+            } catch (error) {
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+                syncBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

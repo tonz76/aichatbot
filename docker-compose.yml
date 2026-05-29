@@ -1,0 +1,24 @@
+services:
+  web-chatbot:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./info:/workspace/info
+      - ./faiss_index:/workspace/faiss_index
+    env_file:
+      - .env  # ดึงค่าตัวแปรสภาพแวดล้อมทั้งหมดจากไฟล์ .env
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+#  cloudflared:
+#    image: cloudflare/cloudflared:latest
+    # สั่งให้วิ่งไปหาพอร์ต 8000 ของคอนเทนเนอร์ web-chatbot โดยตรง
+#    command: tunnel --url http://web-chatbot:8000
+#    depends_on:
+#      - web-chatbot
