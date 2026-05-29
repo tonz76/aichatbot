@@ -7,6 +7,7 @@ env/
 info/
 faiss_index/
 vectorstore/
+chat_history.txt
 
 # Python
 __pycache__/
